@@ -1,0 +1,64 @@
+{
+  // Global definitions affecting all repos
+  "defaults": {
+    "dummy_prefix": "💤 ~ ",
+    "actions": [],
+    "admin": [],
+    "community": [
+      "CONTRIBUTING.md",
+      "SECURITY.md",
+      "CODE_OF_CONDUCT.md"
+    ],
+    "scripts": [],
+    "templates": [
+      "ISSUE_TEMPLATE",
+      "PULL_REQUEST_TEMPLATE"
+    ],
+    "workflows": [
+      "update-submodules.yml"
+    ],
+    "tools": [
+      "validate-github-token.ps1"
+    ]
+  },
+
+  // Items here are deleted if they still exist in target repos
+  "deprecated": {
+    "actions": [
+      "build-dotnet-package",
+      "build-dotnet-release",
+      "check-usage-action",
+      "check-usage-package",
+      "check-usage",
+      "setup-git"
+    ],
+    "admin": [
+      "old-sync-something.sh"
+    ],
+    "community": [
+      "README-template.md",
+      "OLD_CONTRIBUTING.md"
+    ],
+    "scripts": [
+      "bump-version.sh",
+      "bundle-library-releases.sh",
+      "check-org-usage.sh",
+      "init-library-submodules.sh",
+      "sync-library-tags.sh"
+    ],
+    "templates": [
+      "OLD_ISSUE_TEMPLATE"
+    ],
+    "workflows": [
+      "weekly-submodule-update.yml",
+      "test-compile.yml"
+    ],
+    "tools": []
+  },
+  "exclude": {
+    "admin": [
+      "logs",
+      "local-notes.md"
+    ]
+  }
+}
