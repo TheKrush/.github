@@ -1,0 +1,48 @@
+name: 🧱 Build .NET Project
+description: Detects and builds a .NET solution or project.
+
+inputs:
+  project_filter:
+    description: "Optional file pattern (e.g. *Bot.csproj)"
+    default: "*.sln"
+  configuration:
+    default: "Release"
+  verbosity:
+    default: "minimal"
+  gh-token:
+    required: true
+
+outputs:
+  project:
+    value: ${{ steps.detect.outputs.project }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: 🔑 Export GitHub Token
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.gh-token }}" ]; then
+          echo "Setting GH_TOKEN and GITHUB_TOKEN from input..."
+          echo "GH_TOKEN=${{ inputs.gh-token }}" >> "$GITHUB_ENV"
+          echo "GITHUB_TOKEN=${{ inputs.gh-token }}" >> "$GITHUB_ENV"
+        else
+          echo "No gh-token input provided, leaving existing GH_TOKEN/GITHUB_TOKEN unchanged."
+        fi
+
+    - id: detect
+      shell: bash
+      run: |
+        pattern="${{ inputs.project_filter }}"
+        echo "🔍 Searching for $pattern"
+        PROJECT=$(find . -type f -name "$pattern" -print | head -n 1)
+        if [ -z "$PROJECT" ]; then
+          echo "❌ No project found!"
+          exit 1
+        fi
+        echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
+        echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+        echo "📦 Found project: $PROJECT"
+
+        dotnet restore "$PROJECT" --verbosity quiet
+        dotnet build "$PROJECT" -c "${{ inputs.configuration }}" --no-restore --nologo --verbosity "${{ inputs.verbosity }}"

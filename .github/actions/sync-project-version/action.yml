@@ -1,0 +1,70 @@
+name: "🧩 Sync & Commit Project Version"
+description: "Updates <Version> and <PackageVersion> in the primary .csproj being built and optionally commits the change."
+
+inputs:
+  project:
+    description: "Path to the .csproj file to update."
+    required: true
+  version:
+    description: "Version string to apply (usually from bump-version output)."
+    required: true
+  gh-token:
+    description: "GitHub token for committing back to the repo."
+    required: false
+  push:
+    description: "Whether to commit and push version changes (true/false)."
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: 🧩 Update Project Version
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        PROJECT="${{ inputs.project }}"
+        echo "📦 Updating $PROJECT → v${VERSION}"
+
+        if [ ! -f "$PROJECT" ]; then
+          echo "❌ Project file not found: $PROJECT"
+          exit 1
+        fi
+
+        # Update or insert <PackageVersion> and <Version>
+        if grep -q "<PackageVersion>" "$PROJECT"; then
+          sed -i "s|<PackageVersion>.*</PackageVersion>|<PackageVersion>${VERSION}</PackageVersion>|" "$PROJECT"
+        else
+          sed -i "0,/<\/PropertyGroup>/s//  <PackageVersion>${VERSION}<\/PackageVersion>\n&/" "$PROJECT"
+        fi
+
+        if grep -q "<Version>" "$PROJECT"; then
+          sed -i "s|<Version>.*</Version>|<Version>${VERSION}</Version>|" "$PROJECT"
+        else
+          sed -i "0,/<\/PropertyGroup>/s//  <Version>${VERSION}<\/Version>\n&/" "$PROJECT"
+        fi
+
+        echo "✅ Updated $PROJECT to version ${VERSION}"
+
+    - name: 💾 Commit & Push Version
+      if: ${{ inputs.push == 'true' && inputs.gh-token != '' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh-token }}
+      run: |
+        VERSION="${{ inputs.version }}"
+        PROJECT="${{ inputs.project }}"
+        echo "📤 Committing version ${VERSION} changes for ${PROJECT}..."
+
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --global credential.helper store
+        echo "https://x-access-token:${GH_TOKEN}@github.com" > ~/.git-credentials
+
+        if ! git diff --quiet "$PROJECT"; then
+          git add "$PROJECT"
+          git commit -m "🔢 Sync ${PROJECT} version to ${VERSION} [skip ci]"
+          git push
+          echo "✅ Committed and pushed updated version ${VERSION}"
+        else
+          echo "✅ No changes to commit for ${PROJECT}"
+        fi

@@ -1,0 +1,87 @@
+name: 🤖 Publish .NET Release
+description: Builds, publishes, and zips a self-contained .NET application.
+
+inputs:
+  project_filter:
+    default: "*.sln"
+  bump:
+    default: "patch"
+  runtime:
+    default: "win-x64"
+  gh-token:
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: ⚙️ Setup .NET and NuGet
+      uses: ./.github/actions/setup-dotnet-nuget
+      with:
+        gh-token: ${{ inputs.gh-token }}
+        owner: ${{ github.repository_owner }}
+
+    - name: 🔑 Export GitHub Token
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.gh-token }}" ]; then
+          echo "Setting GH_TOKEN and GITHUB_TOKEN from input..."
+          echo "GH_TOKEN=${{ inputs.gh-token }}" >> "$GITHUB_ENV"
+          echo "GITHUB_TOKEN=${{ inputs.gh-token }}" >> "$GITHUB_ENV"
+        else
+          echo "No gh-token input provided, leaving existing GH_TOKEN/GITHUB_TOKEN unchanged."
+        fi
+
+    - name: 🧱 Build Project
+      id: build
+      uses: ./.github/actions/build-dotnet
+      with:
+        project_filter: ${{ inputs.project_filter }}
+        gh-token: ${{ inputs.gh-token }}
+
+    - name: 🔢 Determine Version
+      id: version
+      uses: ./.github/actions/bump-version
+      with:
+        bump: ${{ inputs.bump }}
+
+    - name: 🧩 Sync & Commit Project Version
+      uses: ./.github/actions/sync-project-version
+      with:
+        project: ${{ steps.build.outputs.project }}
+        version: ${{ steps.version.outputs.version }}
+        gh-token: ${{ inputs.gh-token }}
+
+    - name: 🚀 Publish Application
+      id: publish
+      shell: bash
+      run: |
+        OUTPUT="$(pwd)/publish"
+        echo "🚀 Publishing build to: $OUTPUT"
+        dotnet publish "${{ steps.build.outputs.project }}" \
+          -c Release \
+          -r "${{ inputs.runtime }}" \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:IncludeNativeLibrariesForSelfExtract=true \
+          -o "$OUTPUT" \
+          --no-restore
+        echo "output=$OUTPUT" >> $GITHUB_OUTPUT
+
+    - name: 📦 Zip Output
+      id: zip
+      shell: bash
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        ZIP_PATH="release-$VERSION.zip"
+        PUBLISH_DIR="${{ steps.publish.outputs.output }}"
+        echo "📦 Creating archive: $ZIP_PATH"
+        (cd "$PUBLISH_DIR" && zip -r "../$ZIP_PATH" .)
+        echo "zip_path=$ZIP_PATH" >> $GITHUB_OUTPUT
+
+    - name: 🏷️ Tag & Publish Release
+      uses: ./.github/actions/publish-github-release
+      with:
+        version: ${{ steps.version.outputs.version }}
+        gh-token: ${{ inputs.gh-token }}
+        files: ${{ steps.zip.outputs.zip_path }}
+        title: "🤖 ${{ github.event.repository.name }}"

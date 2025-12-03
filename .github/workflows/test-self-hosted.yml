@@ -1,0 +1,140 @@
+name: 🧪 Test Self-Hosted Runner
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - ".github/workflows/test-self-hosted.yml"
+  workflow_dispatch:
+    inputs:
+      runner_label:
+        description: "Optional: Specific self-hosted runner label to target"
+        required: false
+        default: "self-hosted"
+
+jobs:
+  test:
+    name: 🧩 Runner Diagnostics
+    runs-on: ${{ fromJson(format('["{0}"]', github.event.inputs.runner_label || 'self-hosted')) }}
+    timeout-minutes: 5
+
+    steps:
+      - name: 🏁 Identify Runner
+        run: |
+          echo "✅ Running on self-hosted runner"
+          echo "Runner name: $RUNNER_NAME"
+          echo "Runner labels: $RUNNER_TRACKING_ID"
+          echo "OS Info: $(uname -a)"
+          echo "Disk space:"
+          df -h /
+
+      # -----------------------------------------------------------------
+      # 🧰 Install / Verify Core Tools
+      # -----------------------------------------------------------------
+      - name: 🧰 Ensure Core Tooling
+        run: |
+          echo "🔧 Checking and installing base tools..."
+
+          if ! command -v git >/dev/null; then
+            sudo apt-get update && sudo apt-get install -y git
+          fi
+
+          if ! command -v jq >/dev/null; then
+            sudo apt-get install -y jq
+          fi
+
+          if ! command -v zip >/dev/null || ! command -v unzip >/dev/null; then
+            echo "⚙️ Installing zip utilities..."
+            sudo apt-get install -y zip unzip
+          fi
+
+          if ! command -v pwsh >/dev/null; then
+            echo "⚙️ Installing PowerShell..."
+            wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb
+            sudo dpkg -i packages-microsoft-prod.deb
+            sudo apt-get update && sudo apt-get install -y powershell
+          else
+            echo "✅ PowerShell already installed ($(pwsh --version))"
+          fi
+
+          if ! command -v dotnet >/dev/null; then
+            echo "⚙️ Installing .NET SDK..."
+            wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+            bash dotnet-install.sh --channel 8.0
+            export PATH=$PATH:$HOME/.dotnet
+          else
+            echo "✅ .NET SDK already installed ($(dotnet --version))"
+          fi
+
+          if ! command -v node >/dev/null; then
+            echo "⚙️ Installing Node.js..."
+            sudo apt-get install -y nodejs npm
+          fi
+
+          if ! command -v python3 >/dev/null; then
+            echo "⚙️ Installing Python..."
+            sudo apt-get install -y python3 python3-pip
+          fi
+
+          echo "✅ Core tool check complete"
+
+      # -----------------------------------------------------------------
+      # 🔍 Diagnostics: Versions
+      # -----------------------------------------------------------------
+      - name: 🔍 Show Installed Versions
+        run: |
+          echo "Git:        $(git --version)"
+          echo "JQ:         $(jq --version)"
+          echo "PowerShell: $(pwsh --version)"
+          echo "Dotnet:     $(dotnet --version)"
+          echo "Node:       $(node -v)"
+          echo "Python:     $(python3 --version)"
+
+      # -----------------------------------------------------------------
+      # 🧾 Minimal Checkout for Local Actions
+      # -----------------------------------------------------------------
+      - name: 🧾 Minimal Checkout for Local Actions
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/actions
+            .github/scripts
+          fetch-depth: 1
+
+      # -----------------------------------------------------------------
+      # 🧩 Test standard org actions
+      # -----------------------------------------------------------------
+      - name: ⚙️ Validate GH_TOKEN
+        uses: ./.github/actions/validate-gh-token
+        with:
+          gh-token: ${{ secrets.GH_TOKEN }}
+
+      - name: 🧮 Check GitHub Usage
+        id: usage
+        uses: ./.github/actions/check-org-usage
+        with:
+          gh-token: ${{ secrets.GH_TOKEN }}
+          org-name: ${{ github.repository_owner }}
+          check-actions: "true"
+          check-packages-bandwidth: "false"
+
+      # -----------------------------------------------------------------
+      # 🧱 Test Build Script
+      # -----------------------------------------------------------------
+      - name: 🧱 Test Build Script
+        run: |
+          echo "🧪 Simulating typical job..."
+          mkdir -p output
+          echo "Hello from $(hostname) at $(date)" > output/test.txt
+          pwsh -Command "Compress-Archive -Path output/* -DestinationPath output/test.zip -Force"
+          ls -la output
+
+      - name: 📤 Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: self-hosted-test
+          path: output/test.zip
+
+      - name: 🧹 Cleanup Runner
+        if: always()
+        uses: ./.github/actions/cleanup-runner

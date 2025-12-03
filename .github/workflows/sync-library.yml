@@ -1,0 +1,243 @@
+name: 🔄 Sync Libraries
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - ".github/workflows/sync-library.yml"
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:  # ----------------------------------------
+  # 🧩 Precheck
+  # ----------------------------------------
+  precheck:
+    name: 🧮 Precheck
+    if: ${{ !endsWith(github.repository, '/.github') }}
+    # Org repos → self-hosted, user repos → github-hosted
+    runs-on: ${{ github.event.repository.owner.type == 'Organization' && 'self-hosted' || 'ubuntu-latest' }}
+    timeout-minutes: 3
+    continue-on-error: true
+    outputs:
+      # usage.over_limit (org) OR assume-ok.over_limit (user) OR default false
+      over_limit: ${{ steps.usage.outputs.over_limit || steps.assume_ok.outputs.over_limit || 'false' }}
+
+    steps:
+      - name: 🔎 Owner info (debug)
+        run: |
+          echo "Repository:       ${{ github.repository }}"
+          echo "Owner:            ${{ github.repository_owner }}"
+          echo "Owner type:       ${{ github.event.repository.owner.type }}"
+          echo "Runner:           $RUNNER_NAME"
+          echo "Runner OS:        $RUNNER_OS"
+
+      - name: 🧾 Minimal Checkout for Local Actions
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/actions
+            .github/scripts
+          fetch-depth: 1
+
+      # Only needed (and only valid) for org repos
+      - name: ⚙️ Validate GH_TOKEN
+        if: ${{ github.event.repository.owner.type == 'Organization' }}
+        uses: ./.github/actions/validate-gh-token
+        with:
+          gh-token: ${{ secrets.GH_TOKEN }}
+
+      - name: 🧮 Check GitHub Usage (org only)
+        id: usage
+        if: ${{ github.event.repository.owner.type == 'Organization' }}
+        uses: ./.github/actions/check-org-usage
+        with:
+          gh-token: ${{ secrets.GH_TOKEN }}
+          org-name: ${{ github.repository_owner }}
+          check-actions: "true"
+          check-packages-bandwidth: "false"
+
+      # For user repos, we don't care about org minutes at all:
+      # just declare over_limit=false and move on.
+      - name: ✅ Assume under limit (user repos)
+        id: assume_ok
+        if: ${{ github.event.repository.owner.type != 'Organization' }}
+        run: |
+          echo "This is a user-owned repo; skipping org usage checks."
+          echo "over_limit=false" >> "$GITHUB_OUTPUT"
+
+      - name: 📊 Summary
+        run: |
+          echo "Precheck complete."
+          echo "Owner type: ${{ github.event.repository.owner.type }}"
+          echo "over_limit = ${{ steps.usage.outputs.over_limit || steps.assume_ok.outputs.over_limit || 'false' }}"
+
+      - name: 🧹 Cleanup Runner
+        if: always()
+        uses: ./.github/actions/cleanup-runner
+
+  # ----------------------------------------
+  # 🔄 Sync
+  # ----------------------------------------
+  sync:
+    name: ${{ format('🔄 Sync Libraries {0}', needs.precheck.outputs.over_limit == 'true' && '(Self-Hosted)' || '(GitHub)') }}
+    needs: precheck
+    runs-on: ${{ needs.precheck.outputs.over_limit == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.push.outputs.changed }}
+
+    steps:
+      - name: ⚙️ Configure Git
+        shell: bash
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global credential.helper store
+          echo "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
+
+      - name: 🧾 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: 🔢 Determine Bundle Version
+        id: version
+        uses: ./.github/actions/bump-version
+        with:
+          bump: "patch"
+
+      - name: 🔄 Sync & Pin Library Submodules
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          declare -A REPOS=(
+            ["LostMinions.Core"]="https://github.com/LostMinions/LostMinions.Core.git"
+            ["LostMinions.Discord"]="https://github.com/LostMinions/LostMinions.Discord.git"
+            ["LostMinions.GoogleSheets"]="https://github.com/LostMinions/LostMinions.GoogleSheets.git"
+            ["LostMinions.Logging"]="https://github.com/LostMinions/LostMinions.Logging.git"
+          )
+
+          echo
+          echo "🔄 Syncing LostMinions library submodules to latest tagged releases..."
+          echo
+
+          git submodule sync --recursive --quiet
+          git submodule update --init --recursive --quiet
+
+          for name in $(printf '%s\n' "${!REPOS[@]}" | sort); do
+            url="${REPOS[$name]}"
+            path="libs/$name"
+
+            echo "------------------------------------------------------------"
+            echo "📁 $name"
+            echo "  URL  : $url"
+            echo "  Path : $path"
+            echo "------------------------------------------------------------"
+
+            if [ ! -d "$path/.git" ]; then
+              mkdir -p "$(dirname "$path")"
+              git submodule add --force --quiet -b master "$url" "$path"
+            fi
+
+            pushd "$path" >/dev/null
+              git fetch --unshallow 2>/dev/null || git fetch --all --tags --force --quiet
+              latest_tag=$(git for-each-ref --sort=-creatordate --format '%(refname:short)' refs/tags | head -n 1)
+              if [[ -z "$latest_tag" ]]; then
+                echo "⚠️  No tags found for $name — leaving on current commit."
+              else
+                commit=$(git rev-list -n 1 "tags/$latest_tag")
+                echo "Latest tag: $latest_tag ($commit)"
+                git checkout --detach "tags/$latest_tag" --quiet
+                echo "✅  Pinned $name to $latest_tag"
+              fi
+            popd >/dev/null
+            echo
+          done
+
+          if ! git diff --quiet --submodule; then
+            echo "💾 Committing updated submodule references..."
+            git add .gitmodules libs
+            msg="🏷️ Latest tag release"
+            [[ -n "${VERSION:-}" ]] && msg+=" (v${VERSION})"
+            git commit -m "$msg [skip ci]" || true
+            echo "✅ Submodule references updated and committed."
+          else
+            echo "✨ All submodules already up to date."
+          fi
+
+          echo
+          echo "✅ Done — all LostMinions libraries synced to their latest tags."
+
+      - name: 🧹 Cleanup Untracked Files
+        run: git clean -fdx libs
+
+      - name: 💾 Commit & Push Updated Submodules
+        id: push
+        shell: bash
+        run: |
+          git fetch origin master
+
+          # Check if HEAD has unpushed commits or submodule changes
+          if ! git diff --quiet --submodule || [ -n "$(git log origin/master..HEAD)" ]; then
+            echo "🔄 Changes detected or new commits — pushing..."
+            git push origin HEAD:master
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "✅ No submodule updates found."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 🧾 Verify Pinned Submodule State
+        run: |
+          echo
+          echo "📋 Final pinned library versions:"
+          git submodule status --recursive
+          echo
+
+      - name: 🧹 Cleanup Runner
+        if: always()
+        uses: ./.github/actions/cleanup-runner
+
+  # ----------------------------------------
+  # 📦 Publish (conditional)
+  # ----------------------------------------
+  publish:
+    name: ${{ format('📦 Bundle & Publish Libraries {0}', needs.precheck.outputs.over_limit == 'true' && '(Self-Hosted)' || '(GitHub)') }}
+    needs: [precheck, sync]
+    if: needs.sync.outputs.changed == 'true'
+    runs-on: ${{ needs.precheck.outputs.over_limit == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    timeout-minutes: 10
+
+    steps:
+      - name: ⚙️ Configure Git
+        shell: bash
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global credential.helper store
+          echo "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
+
+      - name: ⚙️ Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: 📦 Bundle and Publish
+        uses: ./.github/actions/publish-bundled-libraries
+        with:
+          gh-token: ${{ secrets.GH_TOKEN }}
+          bump: "patch"
+
+      - name: 🧹 Cleanup Runner
+        if: always()
+        uses: ./.github/actions/cleanup-runner

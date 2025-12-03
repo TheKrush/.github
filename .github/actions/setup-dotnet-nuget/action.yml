@@ -1,0 +1,187 @@
+name: "Setup .NET and NuGet for LostMinions"
+description: "Sets up .NET SDK, configures local LostMinions package bundle (if available), and falls back to GitHub Packages feed."
+
+inputs:
+  dotnet-version:
+    description: "SDK version to install"
+    default: "8.0.x"
+  gh-token:
+    description: "GitHub token for NuGet feed authentication"
+    required: true
+  owner:
+    description: "Repository owner (org)"
+    required: true
+  bundle-count:
+    description: "Number of latest LostMinions.Packages releases to mirror locally"
+    default: "10"
+
+runs:
+  using: "composite"
+  steps:
+    # ------------------------------------------------------------
+    # 🧰 Setup .NET SDK
+    # ------------------------------------------------------------
+    - name: 🧰 Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    # ------------------------------------------------------------
+    # 📦 Download or Reuse Global LostMinions.Packages Bundle
+    # ------------------------------------------------------------
+    - name: 📥 Prepare Global LostMinions.Packages Bundle
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh-token }}
+      run: |
+        echo "📦 Checking for LostMinions.Packages bundles..."
+        GLOBAL_DIR="/opt/lostminions/local-packages"
+        mkdir -p "$GLOBAL_DIR" || true
+
+        BUNDLE_COUNT=${{ inputs.bundle-count }}
+        if [[ -z "$BUNDLE_COUNT" ]]; then
+          BUNDLE_COUNT=1
+        fi
+
+        echo "🔢 Will mirror the last $BUNDLE_COUNT release(s)."
+
+        # Fetch last N releases
+        api_response=$(curl -fsSL \
+          -H "Authorization: token $GH_TOKEN" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/LostMinions/LostMinions.Packages/releases?per_page=$BUNDLE_COUNT")
+
+        if [[ -z "$api_response" || "$api_response" == "[]" ]]; then
+          echo "⚠️ No releases returned from GitHub for LostMinions.Packages."
+          exit 0
+        fi
+
+        latest_tag=$(echo "$api_response" | jq -r '.[0].tag_name')
+        echo "🔖 Latest tag from GitHub: $latest_tag"
+
+        # Fast path: if our local .version matches latest_tag, assume contents are OK
+        if [[ -d "$GLOBAL_DIR" && -f "$GLOBAL_DIR/.version" && "$(cat "$GLOBAL_DIR/.version")" == "$latest_tag" ]]; then
+          echo "✅ Global bundle already up-to-date ($latest_tag)."
+        else
+          echo "♻️ Refreshing local bundles (latest tag: $latest_tag)..."
+          # Clear old contents but keep the directory
+          find "$GLOBAL_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} \; || true
+
+          # Iterate over each release in the API payload (up to BUNDLE_COUNT)
+          echo "$api_response" | jq -c '.[]' | while read -r rel; do
+            tag=$(echo "$rel" | jq -r '.tag_name')
+            clean_tag="${tag#v}"
+
+            asset_api_url=$(echo "$rel" | jq -r '.assets[] | select(.name | endswith(".zip")) | .url' | head -n 1)
+            if [[ -z "$asset_api_url" || "$asset_api_url" == "null" ]]; then
+              echo "⚠️ Skipping $tag (no ZIP asset found)."
+              continue
+            fi
+
+            zip_path="$GLOBAL_DIR/LostMinions.Packages-$clean_tag.zip"
+
+            echo "⬇️ Downloading bundle for version $tag..."
+            if curl -L \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/octet-stream" \
+              -o "$zip_path" \
+              "$asset_api_url"; then
+              echo "📂 Extracting $zip_path into $GLOBAL_DIR"
+              unzip -oq "$zip_path" -d "$GLOBAL_DIR"
+              rm -f "$zip_path"
+              echo "✅ Finished $tag"
+            else
+              echo "⚠️ Failed to download bundle for $tag. Continuing with remaining releases."
+            fi
+          done
+
+          echo "$latest_tag" > "$GLOBAL_DIR/.version"
+          echo "✅ Bundles refreshed. Recorded latest tag: $latest_tag"
+        fi
+
+        # Record usable local source ONLY if it contains at least one .nupkg
+        if compgen -G "$GLOBAL_DIR/*.nupkg" > /dev/null; then
+          echo "📦 Local bundle contains packages — enabling local-packages source."
+          echo "$GLOBAL_DIR" > .nuget-local-source
+        else
+          echo "⚠️ Local bundle exists but contains no .nupkg files — skipping local-packages."
+        fi
+
+    # ------------------------------------------------------------
+    # 🔐 Configure NuGet sources
+    # ------------------------------------------------------------
+    - name: 🔐 Configure NuGet feed
+      shell: bash
+      run: |
+        echo "🔧 Configuring NuGet sources..."
+
+        # Clean up any old sources we know about
+        dotnet nuget remove source github --force >/dev/null 2>&1 || true
+        dotnet nuget remove source local-packages --force >/dev/null 2>&1 || true
+
+        # If you want to also clear old github-* sources, you can do it here.
+        # for src in $(dotnet nuget list source | awk '/github-/{print $2}'); do
+        #   dotnet nuget remove source "$src" --force >/dev/null 2>&1 || true
+        # done
+
+        # ----------------------------------------
+        # Local bundle (if present)
+        # ----------------------------------------
+        if [ -f ".nuget-local-source" ] && [ -d "$(cat .nuget-local-source)" ]; then
+          LOCAL_DIR="$(cat .nuget-local-source)"
+          echo "📦 Using local package bundle: $LOCAL_DIR"
+          dotnet nuget add source "$LOCAL_DIR" --name "local-packages" >/dev/null 2>&1 || \
+            echo "⚠️ Failed to add local-packages source (non-fatal)."
+        fi
+
+        # ----------------------------------------
+        # GitHub org feeds
+        # ----------------------------------------
+        BASE_OWNERS=("TheKrush" "LostMinions" "LostMinionsGames" "ThePortalRealm")
+        INPUT_OWNER="${{ inputs.owner }}"
+
+        # Only add inputs.owner if it's not already in BASE_OWNERS and not empty
+        if [ -n "$INPUT_OWNER" ]; then
+          already=false
+          for o in "${BASE_OWNERS[@]}"; do
+            if [ "$o" = "$INPUT_OWNER" ]; then
+              already=true
+              break
+            fi
+          done
+
+          if [ "$already" = false ]; then
+            BASE_OWNERS+=("$INPUT_OWNER")
+          fi
+        fi
+
+        echo "🔗 Configuring GitHub NuGet sources for owners: ${BASE_OWNERS[*]}"
+
+        for OWNER in "${BASE_OWNERS[@]}"; do
+          FEED_URL="https://nuget.pkg.github.com/${OWNER}/index.json"
+          # Source name: github-thekrush, github-lostminions, etc.
+          SRC_NAME="github-$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
+
+          echo "➕ Adding NuGet source $SRC_NAME → $FEED_URL"
+          dotnet nuget add source "$FEED_URL" \
+            --name "$SRC_NAME" \
+            --username "TheKrush" \
+            --password "${{ inputs.gh-token }}" \
+            --store-password-in-clear-text >/dev/null 2>&1 || \
+            echo "⚠️ Failed to add GitHub source for $OWNER (non-fatal)."
+        done
+
+        echo "✅ NuGet sources refreshed cleanly."
+
+    # ------------------------------------------------------------
+    # 💾 Cache NuGet packages (safe for both self-hosted and GitHub)
+    # ------------------------------------------------------------
+    - name: 💾 Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        # 💡 Safe inside workspace, avoids tar relative path issues
+        path: |
+          .nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
