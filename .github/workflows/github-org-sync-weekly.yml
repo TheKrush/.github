@@ -13,6 +13,5 @@ jobs:
     # ✅ Only run for org-owned .github repos
     if: ${{ github.event.repository.owner.type == 'Organization' && endsWith(github.repository, '/.github') }}
     name: ⏰
-    if: ${{ !endsWith(github.repository, '/.github') }}
     uses: ./.github/workflows/github-org-sync.yml
     secrets: inherit
