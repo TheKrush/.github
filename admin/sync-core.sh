@@ -112,15 +112,18 @@ fi
 if ! [[ -s "$SOURCE_COMMITS_FILE" ]]; then
   echo "No watched commits found in push range; scanning recent history for watched paths..."
   count=0
+
+  # Look back through recent commits and grab a few that touched watched paths
   while read -r sha; do
-    local subject
+    # Get the subject and skip sync commits entirely
     subject=$(git -C "$REPO_ROOT" show -s --format='%s' "$sha" || echo "")
     if is_sync_commit "$subject"; then
       continue
     fi
 
-    local paths touched=false
+    # Check if this commit touched any watched paths
     paths=$(git -C "$REPO_ROOT" diff-tree --no-commit-id --name-only -r "$sha" || true)
+    touched=false
 
     while read -r path; do
       [[ -z "$path" ]] && continue
