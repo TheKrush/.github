@@ -362,20 +362,11 @@ run_sync_for_repo() {
         echo "Including source commit summary from origin repo (watched paths only):"
         cat "$SOURCE_COMMITS_FILE"
 
-        if [[ "$IS_DOTGITHUB" == true ]]; then
-          git commit \
-            -m "$commit_msg" \
-            -m "Source commits from ${GITHUB_REPOSITORY:-LostMinions/.github} (watched paths):" \
-            -m "[.github sync hint] This org-level .github mirrors upstream shared config. To reconcile or customize safely, compare this commit with the upstream commits above and either (a) port your changes back to upstream .github, or (b) make a follow-up commit here, knowing future upstream syncs may overwrite local differences." \
-            -m "$(cat "$SOURCE_COMMITS_FILE")" \
-            >/dev/null || true
-        else
-          git commit \
-            -m "$commit_msg" \
-            -m "Source commits from ${GITHUB_REPOSITORY:-LostMinions/.github} (watched paths):" \
-            -m "$(cat "$SOURCE_COMMITS_FILE")" \
-            >/dev/null || true
-        fi
+        git commit \
+          -m "$commit_msg" \
+          -m "Source commits from ${GITHUB_REPOSITORY:-LostMinions/.github} (watched paths):" \
+          -m "$(cat "$SOURCE_COMMITS_FILE")" \
+          >/dev/null || true
       else
         git commit -m "$commit_msg" >/dev/null || true
       fi
