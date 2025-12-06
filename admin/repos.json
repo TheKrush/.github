@@ -62,12 +62,12 @@
         "compile.yml",
         "controller.yml",
         "publish-bot.yml",
+        "publish-zip.yml",
         "update-submodules-daily.yml",
         "update-submodules.yml"
       ],
-      "tools": [
-        "setup-nuget-auth.ps1",
-        "validate-github-token.ps1"
+      "extra_tools": [
+        "setup-nuget-auth.ps1"
       ],
       "editor_files": [
         ".editorconfig",
@@ -79,10 +79,9 @@
       "name": "Stock-Analysis",
       "enabled": true,
       "description": "Python-based stock scanning pipeline and nightly analysis tooling",
-      "tools": [
+      "extra_tools": [
         "initialize-vm-cluster-access.ps1",
-        "invoke-vm-cluster-command.ps1",
-        "validate-github-token.ps1"
+        "invoke-vm-cluster-command.ps1"
       ],
       "editor_files": [
         ".editorconfig"
