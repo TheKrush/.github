@@ -1,6 +1,6 @@
-# Contributing to TheKrush/.github
+# Contributing to TheKrush
 
-Thank you for taking an interest in **TheKrush/.github**.
+Thank you for taking an interest in **TheKrush**.
 
 This repository is **not** a general project space. It is a **super admin hub** used to manage:
 
