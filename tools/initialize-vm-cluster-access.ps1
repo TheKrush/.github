@@ -1,5 +1,6 @@
-# Helper script for managing local VMs from a Windows dev machine.
-# Safe to commit; does NOT contain any secrets or private keys.
+# initialize-vm-cluster-access.ps1
+# Sets up SSH key-based access and local hostnames for a cluster of Linux VMs.
+# Safe to commit; no secrets are stored in this file.
 
 $runners = @(
     # GitHub runners
@@ -7,7 +8,7 @@ $runners = @(
     [PSCustomObject]@{ Ip = "192.168.1.110"; Host = "github-runner-lostminionsgames"; User = "runner" },
     [PSCustomObject]@{ Ip = "192.168.1.109"; Host = "github-runner-theportalrealm";   User = "runner" }
 
-    # Example stock VM (no hostname change, since Host could be $null or left as-is)
+    # Example extra VM:
     # [PSCustomObject]@{ Ip = "192.168.1.242"; Host = "stock-vm"; User = "stock" }
 )
 
@@ -23,7 +24,7 @@ if (!(Test-Path $pubKeyPath)) {
         New-Item -ItemType Directory -Path $sshDir | Out-Null
     }
 
-    & ssh-keygen -t ed25519 -C "runner-key" -f $privKeyPath -N ""
+    & ssh-keygen -t ed25519 -C "vm-cluster-key" -f $privKeyPath -N ""
 
     if ($LASTEXITCODE -ne 0 -or !(Test-Path $pubKeyPath)) {
         Write-Error "Failed to generate SSH key at $pubKeyPath."
@@ -77,26 +78,28 @@ else {
     Write-Warning "Hosts file not found at $hostsFile"
 }
 
-# --- Install pubkey on each runner ------------------------------------------
+# --- Install pubkey on each VM ----------------------------------------------
 foreach ($runner in $runners) {
-    $vmHost = $runner.Ip
-    Write-Host "=== Installing key on $($runner.Host ?? $vmHost) as $($runner.User) ===" -ForegroundColor Cyan
+    $vmHost      = $runner.Ip
+    $displayName = if ($runner.Host) { $runner.Host } else { $vmHost }
+
+    Write-Host "=== Installing key on $displayName as $($runner.User) ===" -ForegroundColor Cyan
 
     type $pubKeyPath | ssh "$($runner.User)@$vmHost" "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
 
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Failed to install key on $($runner.Host ?? $vmHost) (exit code $LASTEXITCODE)."
+        Write-Warning "Failed to install key on $displayName (exit code $LASTEXITCODE)."
     }
     else {
-        Write-Host "Key installed on $($runner.Host ?? $vmHost)" -ForegroundColor Green
+        Write-Host "Key installed on $displayName" -ForegroundColor Green
     }
 
     Start-Sleep -Milliseconds 100   # tiny delay between commands
 }
 
-# --- Set hostname + /etc/hosts + reboot on each runner (if Host is set) -----
+# --- Set hostname + /etc/hosts + reboot on each VM where Host is defined ----
 Write-Host ""
-Write-Host "Setting hostnames and rebooting runners where Host is defined (will prompt for sudo password)..." -ForegroundColor Yellow
+Write-Host "Setting hostnames and rebooting VMs where Host is defined (will prompt for sudo password)..." -ForegroundColor Yellow
 
 foreach ($runner in $runners) {
     if (-not $runner.Host) {
@@ -104,7 +107,7 @@ foreach ($runner in $runners) {
         continue
     }
 
-    $vmHost = $runner.Ip
+    $vmHost   = $runner.Ip
     $hostName = $runner.Host
 
     $remoteCmd = @"

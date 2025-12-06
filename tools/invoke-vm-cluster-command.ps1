@@ -1,3 +1,7 @@
+# invoke-vm-cluster-command.ps1
+# Runs a single shell command across a cluster of Linux VMs (per-VM user/host/ip).
+# Safe to commit; no secrets are stored in this file.
+
 param(
     # Command to run on each VM, e.g.
     # -Command 'sudo apt update && sudo apt upgrade -y'
@@ -6,12 +10,9 @@ param(
 )
 
 if (-not $Command) {
-    $Command = Read-Host "Enter the command to run on each runner"
+    $Command = Read-Host "Enter the command to run on each VM"
 }
 
-# Define your VMs here.
-# Host is the friendly name (and what ssh will use if it resolves),
-# Ip is the fallback, User is the Linux username.
 $runners = @(
     [PSCustomObject]@{ Host = "github-runner-lostminions";      Ip = "192.168.1.108"; User = "runner" },
     [PSCustomObject]@{ Host = "github-runner-lostminionsgames"; Ip = "192.168.1.110"; User = "runner" },
@@ -21,11 +22,11 @@ $runners = @(
 )
 
 foreach ($vm in $runners) {
-    # Prefer Host if set, otherwise fall back to IP
     $target = if ($vm.Host) { $vm.Host } else { $vm.Ip }
 
     Write-Host "===== $($vm.User)@$target =====" -ForegroundColor Cyan
 
+    # If you want it to hard-fail when key auth isn't working, add -o BatchMode=yes
     ssh "$($vm.User)@$target" "$Command"
     $code = $LASTEXITCODE
 
@@ -37,5 +38,5 @@ foreach ($vm in $runners) {
 }
 
 # Examples:
-# .\Invoke-Runners.ps1 -Command 'sudo apt update && sudo apt upgrade -y'
-# .\Invoke-Runners.ps1
+# .\invoke-vm-cluster-command.ps1 -Command 'sudo apt update && sudo apt upgrade -y'
+# .\invoke-vm-cluster-command.ps1
