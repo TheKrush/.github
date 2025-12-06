@@ -17,6 +17,10 @@
       "exclude_community_file": [
         "CONTRIBUTING.md",
         "SECURITY.md"
+      ],
+      "editor_files": [
+        ".editorconfig",
+        "CodeMaid.config"
       ]
     },
     {
@@ -27,6 +31,10 @@
       "exclude_community_file": [
         "CONTRIBUTING.md",
         "SECURITY.md"
+      ],
+      "editor_files": [
+        ".editorconfig",
+        "CodeMaid.config"
       ]
     },
     {
@@ -37,6 +45,10 @@
       "exclude_community_file": [
         "CONTRIBUTING.md",
         "SECURITY.md"
+      ],
+      "editor_files": [
+        ".editorconfig",
+        "CodeMaid.config"
       ]
     },
 
