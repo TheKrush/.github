@@ -15,6 +15,7 @@
       "enabled": true,
       "description": "Admin repo for LostMinions",
       "exclude_community_file": [
+        "admin/community/CONTRIBUTING.project.md",
         "CONTRIBUTING.md",
         "SECURITY.md"
       ],
@@ -29,6 +30,7 @@
       "enabled": true,
       "description": "Admin repo for LostMinionsGames",
       "exclude_community_file": [
+        "admin/community/CONTRIBUTING.project.md",
         "CONTRIBUTING.md",
         "SECURITY.md"
       ],
@@ -43,6 +45,7 @@
       "enabled": true,
       "description": "Admin repo for ThePortalRealm",
       "exclude_community_file": [
+        "admin/community/CONTRIBUTING.project.md",
         "CONTRIBUTING.md",
         "SECURITY.md"
       ],
