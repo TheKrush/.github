@@ -66,7 +66,8 @@
         "compile.yml"
       ],
       "tools": [
-        "setup-nuget-auth.ps1"
+        "setup-nuget-auth.ps1",
+        "validate-github-token.ps1"
       ],
       "editor_files": [
         ".editorconfig",
