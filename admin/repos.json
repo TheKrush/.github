@@ -73,6 +73,20 @@
         ".editorconfig",
         "CodeMaid.config"
       ]
+    },
+    {
+      "owner": "TheKrush",
+      "name": "Stock-Analysis",
+      "enabled": true,
+      "description": "Python-based stock scanning pipeline and nightly analysis tooling",
+      "tools": [
+        "initialize-vm-cluster-access.ps1",
+        "invoke-vm-cluster-command.ps1",
+        "validate-github-token.ps1"
+      ],
+      "editor_files": [
+        ".editorconfig"
+      ]
     }
   ]
 }
