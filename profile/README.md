@@ -66,7 +66,7 @@ Some projects are polished. Some are prototypes. All of them are part of figurin
 
 Most of the public-facing links, communities, and socials live under the **Lost Minions** banner:
 
-- 🌲 Link hub: https://lostminions.org/links
+- 🌲 [Link hub](https://lostminions.org/links)
 
 From there you can find Discord, socials, shops, and more.
 
