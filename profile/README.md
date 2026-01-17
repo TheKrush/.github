@@ -9,7 +9,7 @@
 
 I live in the overlap between:
 
-- **Automation & DevOps** – GitHub Actions, sync hubs, and scripts that keep a small empire of repos aligned.
+- **Automation & DevOps** – GitHub Actions, sync tooling, and scripts that keep a small empire of repos aligned.
 - **Bots & Tools** – Discord bots, stock scanners, calendar tools, and whatever else seems useful (or chaotic) at the time.
 - **Worlds & Lore** – D&D multiverses, campaign tooling, and narrative systems that blur the line between code and story.
 
@@ -29,23 +29,7 @@ I organize work across a few focused GitHub orgs:
 | 🎮 **LostMinionsGames** | Game prototypes, Unreal Engine experiments, shared gameplay systems. |
 | 🌌 **ThePortalRealm** | D&D multiverse, lore, calendars, and campaign tooling. |
 
-This account (`TheKrush`) also hosts:
-
-- Personal experiments
-- Shared infrastructure
-- The **super admin hub** (`TheKrush/.github`) that pushes workflows, scripts, and standards out to those orgs and selected private repos.
-
----
-
-### 🔧 Super Admin Hub
-
-`TheKrush/.github` is my control plane:
-
-- Central **workflows** and **composite actions**
-- A shared **/admin** sync engine
-- Repo lists and manifests that keep multiple orgs in sync
-
-Changes there can fan out across dozens of repos, so it’s mostly infrastructure, not feature work.
+This account (`TheKrush`) also hosts experiments, shared infrastructure, and utilities that support the ecosystem.
 
 ---
 
@@ -62,13 +46,9 @@ Some projects are polished. Some are prototypes. All of them are part of figurin
 
 ---
 
-### 💬 Elsewhere
+### 🔗 Links
 
-Most of the public-facing links, communities, and socials live under the **Lost Minions** banner:
-
-- 🌲 [Link hub](https://lostminions.org/links)
-
-From there you can find Discord, socials, shops, and more.
+- 🌲 **Links:** https://keithyates.us/links
 
 ---
 
