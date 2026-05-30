@@ -48,9 +48,9 @@ For each repo:
 
 ## 📝 How to Contribute
 
-1. **Fork or branch from `main`**
+1. **Fork or branch from `master`**
    - For external contributors, fork the repo.
-   - For collaborators, create a feature branch from `main`.
+   - For collaborators, create a feature branch from `master`.
 
 2. **Create or link an issue**
    - Reference an existing issue if one already tracks your change.
