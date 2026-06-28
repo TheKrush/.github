@@ -2,30 +2,23 @@
 
 Thank you for taking an interest in **TheKrush**.
 
-This file is shared across multiple repositories under the `TheKrush` umbrella:
-stock tools, bots, libraries, and supporting infrastructure.
-Each repo may have its own README or docs with project-specific details — always
-read those first.
+This file is shared across multiple repositories under the `TheKrush` umbrella: stock tools, bots, libraries, and supporting infrastructure. Each repo may have its own README or docs with project-specific details — always read those first.
 
 ---
 
 ## 🧭 Where to Start
 
-- **New idea or feature request?**
-  Open an issue in the target repo and describe:
+- **New idea or feature request?** Open an issue in the target repo and describe:
   - What problem you’re solving
   - How you imagine it working
   - Any related tools or workflows
 
-- **Bug fix or small improvement?**
-  Check existing issues first. If nothing matches, open a new issue with:
+- **Bug fix or small improvement?** Check existing issues first. If nothing matches, open a new issue with:
   - Steps to reproduce
   - Expected vs actual behavior
   - Logs, screenshots, or error messages if available
 
-- **Docs or README improvements?**
-  You can usually open a PR directly. If you’re changing behavior or APIs,
-  please link or create an issue.
+- **Docs or README improvements?** You can usually open a PR directly. If you’re changing behavior or APIs, please link or create an issue.
 
 ---
 
@@ -59,8 +52,7 @@ For each repo:
 3. **Make focused, readable commits**
    - Group related changes together.
    - Use clear messages that explain *why*, not just *what*, you changed.
-   - If your repo uses commit tags (e.g. `[skip ci]`, `[publish]`, `[publish-zip]`),
-     follow any conventions noted in the README.
+   - If your repo uses commit tags (e.g. `[skip ci]`, `[publish]`, `[publish-zip]`), follow any conventions noted in the README.
 
 4. **Add tests where appropriate**
    - For code changes, add or update unit/integration tests if the project has them.
@@ -82,11 +74,9 @@ For each repo:
 
 ## ⚖️ Code of Conduct
 
-All contributions must follow the
-[Lost Minions / TheKrush Code of Conduct](./CODE_OF_CONDUCT.md).
+All contributions must follow the [Lost Minions / TheKrush Code of Conduct](./CODE_OF_CONDUCT.md).
 
-Be respectful, patient, and collaborative — whether you’re editing a small
-Python script or a core workflow used across many repositories.
+Be respectful, patient, and collaborative — whether you’re editing a small Python script or a core workflow used across many repositories.
 
 ---
 
@@ -95,8 +85,7 @@ Python script or a core workflow used across many repositories.
 If you discover a security issue:
 
 - **Do not** open a public issue.
-- Report privately via [GitHub Security Advisories](../../security/advisories) or email:
-  **security@lostminions.org**
+- Report privately via [GitHub Security Advisories](../../security/advisories) or email: **security@lostminions.org**
 
 Please include as much detail as you can:
 - A clear description of the problem
@@ -115,5 +104,4 @@ If you’re unsure about anything:
 - How a script, workflow, or bot is supposed to behave
 - What impact a change might have on other projects
 
-Open a **“Question”** issue in the relevant repo with as much context as you can.
-It’s always better to ask early than to guess and fight the automation later.
+Open a **“Question”** issue in the relevant repo with as much context as you can. It’s always better to ask early than to guess and fight the automation later.
